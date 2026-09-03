@@ -29,6 +29,17 @@ function parseStatus(raw) {
       serviceEnabled: data.serviceEnabled === true,
       serviceMatchesVault: data.serviceMatchesVault !== false,
       latestActivity: clean(data.latestActivity),
+      localVaults: Array.isArray(data.localVaults) ? data.localVaults.map(function(vault) {
+        return {
+          id: clean(vault && vault.id),
+          name: clean(vault && vault.name) || "Unnamed vault",
+          path: clean(vault && vault.path),
+          host: clean(vault && vault.host),
+          syncMode: clean(vault && vault.syncMode) || "bidirectional",
+          selected: vault && vault.selected === true,
+          serviceSelected: vault && vault.serviceSelected === true
+        }
+      }).filter(function(vault) { return vault.id !== "" && vault.path !== "" }) : [],
       error: clean(data.error)
     }
   } catch (error) {

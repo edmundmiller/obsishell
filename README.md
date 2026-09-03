@@ -2,7 +2,8 @@
 
 Obsidian Headless Sync in the Omarchy bar. Obsishell installs and configures
 the official `obsidian-headless` client, runs continuous sync as a systemd user
-service, and shows the selected vault's service state and latest activity.
+service, and shows every configured vault, local folder, sync mode, service
+state, and latest continuous-sync activity in a color-coded panel.
 
 ## Install
 
@@ -54,7 +55,10 @@ widget settings to an absolute local vault path to select another configured
 vault. Starting continuous sync for a different vault switches the service to
 that vault.
 
-Independent one-time syncs remain available for any vault through the `ob` CLI.
+Each vault card can open its local folder or launch a one-time sync. Obsidian
+Headless currently exposes live activity only for the one vault managed by the
+continuous-sync service; other cards therefore show configuration readiness
+rather than invented file progress.
 
 ## What it changes
 

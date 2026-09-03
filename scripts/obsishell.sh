@@ -56,6 +56,7 @@ unit_is_ours() {
 
 detect_status() {
   local requested_path="${1:-}" ob="" version="" list_json='{"vaults":[]}'
+  local local_vaults='[]' vault_json="" vault_status="{}" vault_item=""
   local vault_count=0 selected_path="" selected_id="" status_json="{}"
   local vault_name="" sync_mode="bidirectional" configured=false error=""
   local installed=false supported=false state="missing"
@@ -133,6 +134,38 @@ detect_status() {
     state="missing"
   fi
 
+  if [[ $installed == true ]]; then
+    while IFS= read -r vault_json; do
+      local item_id="" item_path="" item_host="" item_name="" item_mode="bidirectional"
+      item_id="$(jq -r '.id // ""' <<<"$vault_json")"
+      item_path="$(jq -r '.path // ""' <<<"$vault_json")"
+      item_host="$(jq -r '.host // ""' <<<"$vault_json")"
+      if [[ -n $item_path ]] && vault_status="$($ob sync-status --json --path "$item_path" 2>/dev/null)"; then
+        item_name="$(jq -r '.vaultName // ""' <<<"$vault_status")"
+        item_mode="$(jq -r '.syncMode // "bidirectional"' <<<"$vault_status")"
+      fi
+      [[ -n $item_name ]] || item_name="$(basename -- "$item_path")"
+      vault_item="$(jq -n \
+        --arg id "$item_id" \
+        --arg name "$item_name" \
+        --arg path "$item_path" \
+        --arg host "$item_host" \
+        --arg syncMode "$item_mode" \
+        --arg selectedPath "$selected_path" \
+        --arg servicePath "$service_path" \
+        '{
+          id: $id,
+          name: $name,
+          path: $path,
+          host: $host,
+          syncMode: $syncMode,
+          selected: ($path == $selectedPath),
+          serviceSelected: ($path == $servicePath)
+        }')"
+      local_vaults="$(jq --argjson item "$vault_item" '. + [$item]' <<<"$local_vaults")"
+    done < <(jq -c '.vaults[]' <<<"$list_json")
+  fi
+
   jq -n \
     --arg state "$state" \
     --arg version "$version" \
@@ -149,6 +182,7 @@ detect_status() {
     --argjson serviceMatchesVault "$service_matches" \
     --arg latestActivity "$latest_activity" \
     --arg error "$error" \
+    --argjson localVaults "$local_vaults" \
     '{
       state: $state,
       installed: $installed,
@@ -164,6 +198,7 @@ detect_status() {
       serviceEnabled: $serviceEnabled,
       serviceMatchesVault: $serviceMatchesVault,
       latestActivity: $latestActivity,
+      localVaults: $localVaults,
       error: $error
     }'
 }

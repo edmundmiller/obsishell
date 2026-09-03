@@ -13,6 +13,9 @@ Panel {
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
+  readonly property color warning: "#ebcb8b"
+  readonly property color success: "#a3be8c"
+  readonly property color syncColor: "#26b6db"
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color barIconColor: sync.lastError !== ""
@@ -168,41 +171,53 @@ Panel {
         else if (key === "q") root.close()
       }
 
-      Column {
-        id: content
-        width: parent.width
-        spacing: Style.space(12)
+      Flickable {
+        id: panelFlick
+        anchors.fill: parent
+        contentWidth: width
+        contentHeight: content.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
+        interactive: contentHeight > height
+        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-        PanelHero {
-          width: parent.width
-          title: sync.vaultName || "Obsidian Sync"
-          meta: sync.statusText
-          detail: sync.configured ? sync.syncMode : ""
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          iconOpacity: sync.installed ? 1.0 : 0.5
-          iconComponent: Component {
-            ObsidianIcon {
-              iconSize: Style.font.display
-              color: sync.lastError !== "" ? root.urgent : root.foreground
+        Column {
+          id: content
+          width: panelFlick.width
+          spacing: Style.space(12)
+
+          PanelHero {
+            width: parent.width
+            title: "Obsidian Sync"
+            meta: sync.statusText
+            detail: ""
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            iconOpacity: sync.installed ? 1.0 : 0.5
+            iconComponent: Component {
+              ObsidianIcon {
+                iconSize: Style.font.display
+                color: sync.lastError !== "" ? root.urgent
+                  : (sync.serviceRunning ? root.syncColor : root.foreground)
+              }
             }
-          }
-          trailingControl: Component {
-            ToggleSwitch {
-              id: powerSwitch
-              visible: sync.configured && !root.setupOpen
-              checked: sync.serviceRunning && sync.serviceMatchesVault
-              busy: sync.busy
-              foreground: root.foreground
-              onToggled: sync.toggleContinuous()
-              PanelToolTip {
-                visible: powerSwitch.containsMouse
-                text: powerSwitch.checked ? "Stop continuous sync" : "Start continuous sync"
-                fontFamily: root.fontFamily
+            trailingControl: Component {
+              ToggleSwitch {
+                id: powerSwitch
+                visible: sync.configured && !root.setupOpen
+                checked: sync.serviceRunning && sync.serviceMatchesVault
+                busy: sync.busy
+                foreground: root.foreground
+                onToggled: sync.toggleContinuous()
+                PanelToolTip {
+                  visible: powerSwitch.containsMouse
+                  text: powerSwitch.checked ? "Stop continuous sync" : "Start continuous sync"
+                  fontFamily: root.fontFamily
+                }
               }
             }
           }
-        }
 
         Text {
           visible: sync.actionStatus !== "" || sync.lastError !== ""
@@ -234,38 +249,140 @@ Panel {
           wrapMode: Text.WordWrap
         }
 
-        Column {
-          visible: sync.configured && !root.setupOpen
-          width: parent.width
-          spacing: Style.space(5)
-
-          PanelSectionHeader {
-            text: "VAULT"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-          }
-
-          Text {
+          Column {
+            visible: sync.localVaults.length > 0 && !root.setupOpen
             width: parent.width
-            text: sync.vaultPath
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            elide: Text.ElideMiddle
-          }
+            spacing: Style.space(8)
 
-          Text {
-            visible: sync.latestActivity !== ""
-            width: parent.width
-            text: sync.latestActivity
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-            maximumLineCount: 2
-            elide: Text.ElideRight
+            PanelSectionHeader {
+              text: "VAULTS"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            Repeater {
+              model: sync.localVaults
+
+              Rectangle {
+                id: vaultCard
+                required property var modelData
+                readonly property bool problem: modelData.selected && sync.lastError !== ""
+                readonly property bool active: modelData.serviceSelected && sync.serviceRunning
+                readonly property bool paused: modelData.serviceSelected && !sync.serviceRunning
+                readonly property color stateColor: problem ? root.urgent
+                  : (active || paused ? root.warning : root.success)
+                readonly property string stateLabel: problem ? "ATTENTION"
+                  : (active ? "SYNCING" : (paused ? "PAUSED" : "READY"))
+
+                width: parent.width
+                implicitHeight: vaultDetails.implicitHeight + Style.space(16)
+                color: "transparent"
+                border.width: Style.normalBorderWidth
+                border.color: problem ? root.urgent : root.dim
+                radius: Style.cornerRadius
+
+                Column {
+                  id: vaultDetails
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.top: parent.top
+                  anchors.margins: Style.space(8)
+                  spacing: Style.space(4)
+
+                  Row {
+                    width: parent.width
+                    spacing: Style.space(6)
+
+                    Text {
+                      width: parent.width - vaultBadge.width - parent.spacing
+                      text: "󰉋  " + vaultCard.modelData.name
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      elide: Text.ElideRight
+                    }
+
+                    Rectangle {
+                      id: vaultBadge
+                      width: vaultState.implicitWidth + Style.space(10)
+                      height: vaultState.implicitHeight + Style.space(4)
+                      color: "transparent"
+                      border.width: Style.normalBorderWidth
+                      border.color: vaultCard.stateColor
+                      radius: Style.cornerRadius
+
+                      Text {
+                        id: vaultState
+                        anchors.centerIn: parent
+                        text: vaultCard.stateLabel
+                        color: vaultCard.stateColor
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        font.bold: true
+                      }
+                    }
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: vaultCard.modelData.syncMode
+                      + (vaultCard.modelData.host ? "  ·  " + vaultCard.modelData.host : "")
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: vaultCard.modelData.path
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideMiddle
+                  }
+
+                  Text {
+                    visible: vaultCard.modelData.serviceSelected && sync.latestActivity !== ""
+                    width: parent.width
+                    text: sync.latestActivity
+                    color: vaultCard.active ? root.syncColor : root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    maximumLineCount: 2
+                    wrapMode: Text.WordWrap
+                    elide: Text.ElideRight
+                  }
+
+                  Row {
+                    width: parent.width
+                    spacing: Style.space(6)
+
+                    Button {
+                      width: (parent.width - parent.spacing) / 2
+                      text: "Open"
+                      iconText: "󰉋"
+                      bordered: true
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      onClicked: sync.openPath(vaultCard.modelData.path)
+                    }
+
+                    Button {
+                      width: (parent.width - parent.spacing) / 2
+                      text: "Sync now"
+                      iconText: "󰑐"
+                      bordered: true
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      onClicked: sync.syncPath(vaultCard.modelData.path)
+                    }
+                  }
+                }
+              }
+            }
           }
-        }
 
         PanelSeparator {
           foreground: root.foreground
@@ -450,14 +567,15 @@ Panel {
           }
         }
 
-        Text {
-          width: parent.width
-          text: "r refresh  ·  p power  ·  s sync  ·  o open  ·  l logs  ·  q close"
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          horizontalAlignment: Text.AlignHCenter
-          wrapMode: Text.WordWrap
+          Text {
+            width: parent.width
+            text: "r refresh  ·  p power  ·  s sync  ·  o open  ·  l logs  ·  q close"
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+          }
         }
       }
     }

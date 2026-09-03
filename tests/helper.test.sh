@@ -22,10 +22,14 @@ cat >"$fake_bin/ob" <<'EOF'
 case "${1:-}" in
   --version) printf '0.0.14\n' ;;
   sync-list-local)
-    printf '{"vaults":[{"id":"vault-1","path":"%s/Vault With Spaces","host":"sync.example"}]}\n' "$HOME"
+    printf '{"vaults":[{"id":"vault-1","path":"%s/Vault With Spaces","host":"sync.example"},{"id":"vault-2","path":"%s/Work","host":"sync.example"}]}\n' "$HOME" "$HOME"
     ;;
   sync-status)
-    printf '{"vaultId":"vault-1","vaultName":"Notes","vaultPath":"%s/Vault With Spaces","syncMode":"bidirectional"}\n' "$HOME"
+    if [[ $* == *"$HOME/Work"* ]]; then
+      printf '{"vaultId":"vault-2","vaultName":"Work","vaultPath":"%s/Work","syncMode":"pull-only"}\n' "$HOME"
+    else
+      printf '{"vaultId":"vault-1","vaultName":"Notes","vaultPath":"%s/Vault With Spaces","syncMode":"bidirectional"}\n' "$HOME"
+    fi
     ;;
   sync-list-remote)
     printf '{"vaults":[{"id":"vault-1","name":"Notes","region":"North America"}],"shared":[]}\n'
@@ -52,7 +56,7 @@ EOF
 chmod +x "$fake_bin/node" "$fake_bin/ob" "$fake_bin/systemctl" "$fake_bin/journalctl"
 
 status="$(bash "$root/scripts/obsishell.sh" status)"
-jq -e --arg path "$HOME/Vault With Spaces" '
+jq -e --arg path "$HOME/Vault With Spaces" --arg work "$HOME/Work" '
   .state == "stopped"
   and .installed == true
   and .nodeSupported == true
@@ -60,6 +64,26 @@ jq -e --arg path "$HOME/Vault With Spaces" '
   and .vaultName == "Notes"
   and .vaultPath == $path
   and .latestActivity == "Fully synced"
+  and .localVaults == [
+    {
+      id: "vault-1",
+      name: "Notes",
+      path: $path,
+      host: "sync.example",
+      syncMode: "bidirectional",
+      selected: true,
+      serviceSelected: false
+    },
+    {
+      id: "vault-2",
+      name: "Work",
+      path: $work,
+      host: "sync.example",
+      syncMode: "pull-only",
+      selected: false,
+      serviceSelected: false
+    }
+  ]
 ' <<<"$status" >/dev/null
 
 remotes="$(bash "$root/scripts/obsishell.sh" remote-vaults)"
@@ -86,7 +110,11 @@ grep -Fq 'enable --now obsishell.service' "$HOME/systemctl-calls"
 export FAKE_ACTIVE_STATE=active
 export FAKE_UNIT_STATE=enabled
 status="$(bash "$root/scripts/obsishell.sh" status "$HOME/Vault With Spaces")"
-jq -e '.state == "running" and .serviceRunning == true and .serviceEnabled == true' \
+jq -e '.state == "running"
+  and .serviceRunning == true
+  and .serviceEnabled == true
+  and .localVaults[0].serviceSelected == true
+  and .localVaults[1].serviceSelected == false' \
   <<<"$status" >/dev/null
 
 bash "$root/scripts/obsishell.sh" run-service

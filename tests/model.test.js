@@ -17,12 +17,23 @@ const running = model.parseStatus(JSON.stringify({
   serviceEnabled: true,
   serviceMatchesVault: true,
   latestActivity: "Fully synced",
+  localVaults: [{
+    id: "vault-1",
+    name: "Notes",
+    path: "/home/test/Notes",
+    host: "sync.example",
+    syncMode: "pull-only",
+    selected: true,
+    serviceSelected: true
+  }],
   error: ""
 }))
 
 assert.equal(running.ok, true)
 assert.equal(running.vaultName, "Notes")
 assert.equal(running.vaultCount, 2)
+assert.equal(running.localVaults[0].name, "Notes")
+assert.equal(running.localVaults[0].serviceSelected, true)
 assert.equal(model.statusText(running), "Continuous sync is running")
 assert.deepEqual(model.parseStatus(""), { ok: false, error: "Empty status response" })
 assert.deepEqual(model.parseStatus("{"), { ok: false, error: "Invalid status response" })

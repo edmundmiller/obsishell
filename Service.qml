@@ -22,6 +22,7 @@ Item {
   property bool serviceEnabled: false
   property bool serviceMatchesVault: true
   property string latestActivity: ""
+  property var localVaults: []
   property string statusText: "Checking…"
   property string actionStatus: ""
   property string lastError: ""
@@ -106,6 +107,7 @@ Item {
     serviceEnabled = status.serviceEnabled
     serviceMatchesVault = status.serviceMatchesVault
     latestActivity = status.latestActivity
+    localVaults = status.localVaults
     statusText = Model.statusText(status)
     lastError = status.error
   }
@@ -157,11 +159,16 @@ Item {
   function login() { launchTerminal("login") }
   function setup() { launchTerminal("setup") }
   function setupSelected(vaultId, path) { launchTerminal("setup-selected", vaultId, path) }
-  function syncOnce() { if (configured) launchTerminal("sync-once", vaultPath) }
+  function syncOnce() { if (configured) syncPath(vaultPath) }
+  function syncPath(path) { if (path !== "") launchTerminal("sync-once", path) }
   function showLogs() { launchTerminal("logs") }
 
   function openVault() {
-    if (vaultPath !== "") Quickshell.execDetached(["uwsm-app", "--", "xdg-open", vaultPath])
+    openPath(vaultPath)
+  }
+
+  function openPath(path) {
+    if (path !== "") Quickshell.execDetached(["uwsm-app", "--", "xdg-open", path])
   }
 
   Timer {
