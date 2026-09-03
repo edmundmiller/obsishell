@@ -92,6 +92,9 @@ jq -e '.state == "running" and .serviceRunning == true and .serviceEnabled == tr
 bash "$root/scripts/obsishell.sh" run-service
 [[ $(<"$HOME/sync-args") == "sync --continuous --path $HOME/Vault With Spaces" ]]
 
+bash "$root/scripts/obsishell.sh" service-stop >/dev/null
+grep -Fq 'reset-failed obsishell.service' "$HOME/systemctl-calls"
+
 bash "$root/scripts/obsishell.sh" service-remove >/dev/null
 [[ ! -e $unit ]]
 

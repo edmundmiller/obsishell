@@ -225,6 +225,7 @@ stop_service() {
   if [[ -e $service_file || -L $service_file ]]; then
     unit_is_ours || fail "$service_file is not managed by obsishell"
     systemctl --user disable --now "$service_name"
+    systemctl --user reset-failed "$service_name" 2>/dev/null || true
   fi
   printf 'Continuous sync stopped\n'
 }
