@@ -27,6 +27,10 @@ case "${1:-}" in
   sync-status)
     printf '{"vaultId":"vault-1","vaultName":"Notes","vaultPath":"%s/Vault With Spaces","syncMode":"bidirectional"}\n' "$HOME"
     ;;
+  sync-list-remote)
+    printf '{"vaults":[{"id":"vault-1","name":"Notes","region":"North America"}],"shared":[]}\n'
+    ;;
+  sync-setup) printf '<%s>\n' "$@" >"$HOME/setup-args" ;;
   sync) printf '%s\n' "$*" >"$HOME/sync-args" ;;
   *) exit 2 ;;
 esac
@@ -57,6 +61,20 @@ jq -e --arg path "$HOME/Vault With Spaces" '
   and .vaultPath == $path
   and .latestActivity == "Fully synced"
 ' <<<"$status" >/dev/null
+
+remotes="$(bash "$root/scripts/obsishell.sh" remote-vaults)"
+jq -e '.vaults[0].id == "vault-1" and .shared == []' <<<"$remotes" >/dev/null
+
+printf 'y\nn\n\n' | bash "$root/scripts/obsishell.sh" run-terminal \
+  setup-selected "vault id with spaces" "$HOME/New Vault" >/dev/null
+cat >"$tmp/expected-setup-args" <<EOF
+<sync-setup>
+<--vault>
+<vault id with spaces>
+<--path>
+<$HOME/New Vault>
+EOF
+diff -u "$tmp/expected-setup-args" "$HOME/setup-args"
 
 bash "$root/scripts/obsishell.sh" service-start "$HOME/Vault With Spaces" >/dev/null
 unit="$XDG_CONFIG_HOME/systemd/user/obsishell.service"

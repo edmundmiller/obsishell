@@ -28,6 +28,36 @@ assert.deepEqual(model.parseStatus(""), { ok: false, error: "Empty status respon
 assert.deepEqual(model.parseStatus("{"), { ok: false, error: "Invalid status response" })
 assert.deepEqual(model.parseStatus('{"state":"wat"}'), { ok: false, error: "Invalid status response" })
 
+const remotes = model.parseRemoteVaults(JSON.stringify({
+  vaults: [{ id: "personal-1", name: "Notes", region: "North America" }],
+  shared: [{ id: "shared-1", name: "Team", region: "Europe" }]
+}))
+assert.equal(remotes.ok, true)
+assert.deepEqual(remotes.vaults, [
+  {
+    id: "personal-1",
+    name: "Notes",
+    region: "North America",
+    shared: false,
+    label: "Notes · North America"
+  },
+  {
+    id: "shared-1",
+    name: "Team",
+    region: "Europe",
+    shared: true,
+    label: "Team (shared) · Europe"
+  }
+])
+assert.deepEqual(model.parseRemoteVaults("{}"), {
+  ok: false,
+  error: "Invalid remote vault response"
+})
+assert.deepEqual(model.parseRemoteVaults("{"), {
+  ok: false,
+  error: "Invalid remote vault response"
+})
+
 const root = path.resolve(__dirname, "..")
 const panel = fs.readFileSync(path.join(root, "Panel.qml"), "utf8")
 const icon = fs.readFileSync(path.join(root, "assets/obsidian.svg"), "utf8")
