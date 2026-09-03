@@ -52,20 +52,11 @@ Panel {
     tooltipText: sync.lastError || sync.statusText
     iconComponent: Component {
       Item {
-        Text {
+        ObsidianIcon {
           anchors.centerIn: parent
-          text: "◆"
+          iconSize: Style.space(14)
           color: root.barIconColor
-          font.family: root.fontFamily
-          font.pixelSize: Style.space(13)
-          opacity: sync.refreshing ? 0.55 : 1.0
-
-          SequentialAnimation on opacity {
-            running: sync.refreshing
-            loops: Animation.Infinite
-            NumberAnimation { to: 0.35; duration: 450 }
-            NumberAnimation { to: 1.0; duration: 450 }
-          }
+          pulsing: sync.refreshing
         }
       }
     }
@@ -115,11 +106,9 @@ Panel {
           fontFamily: root.fontFamily
           iconOpacity: sync.installed ? 1.0 : 0.5
           iconComponent: Component {
-            Text {
-              text: "◆"
+            ObsidianIcon {
+              iconSize: Style.font.display
               color: sync.lastError !== "" ? root.urgent : root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.display
             }
           }
           trailingControl: Component {

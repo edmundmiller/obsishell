@@ -10,7 +10,7 @@ service, and shows the selected vault's service state and latest activity.
 omarchy plugin add https://github.com/edmundmiller/obsishell.git --enable
 ```
 
-Open the diamond in the bar, then:
+Open the Obsidian icon in the bar, then:
 
 1. Select **Install Obsidian Headless**. This installs Node.js 22+ through
    Omarchy if needed, then installs `obsidian-headless` into `~/.local`.
@@ -67,6 +67,10 @@ Independent one-time syncs remain available for any vault through the `ob` CLI.
 Authentication tokens and vault encryption keys remain owned by the official
 client under `~/.config/obsidian-headless/`. Obsishell does not read, copy, log,
 or pass credentials itself.
+
+The official Obsidian silhouette is rendered as a monochrome mask. Its color
+follows the current Omarchy theme, dims while continuous sync is stopped, and
+uses the theme's urgent color when status checks fail.
 
 ## Remove
 
