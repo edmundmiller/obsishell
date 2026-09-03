@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.edmundmiller.obsishell",
   "name": "Obsidian Headless Sync",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Edmund Miller",
   "license": "MIT",
   "description": "Monitor and control Obsidian Headless Sync from the Omarchy bar.",

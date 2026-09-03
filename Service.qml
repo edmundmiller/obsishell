@@ -26,6 +26,9 @@ Item {
   property string actionStatus: ""
   property string lastError: ""
   property bool refreshing: false
+  property var remoteVaults: []
+  property string remoteError: ""
+  property bool remoteLoading: false
 
   property string _statusOutput: ""
   property string _statusError: ""
@@ -33,11 +36,17 @@ Item {
   property string _actionError: ""
   property bool _refreshPending: false
   property bool _statusTimedOut: false
+  property string _remoteOutput: ""
+  property string _remoteError: ""
+  property bool _remoteTimedOut: false
 
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 15, 5, 3600)
   readonly property string requestedVaultPath: String(setting("vaultPath", "") || "").trim()
   readonly property bool busy: statusProcess.running || actionProcess.running
   readonly property string helperPath: localPath(Qt.resolvedUrl("scripts/obsishell.sh"))
+  readonly property var remoteOptions: remoteVaults.map(function(vault) {
+    return { value: vault.id, label: vault.label }
+  })
 
   function setting(name, fallback) {
     var value = settings ? settings[name] : undefined
@@ -114,13 +123,41 @@ Item {
     runServiceAction(serviceRunning && serviceMatchesVault ? "service-stop" : "service-start")
   }
 
-  function launchTerminal(action) {
-    Quickshell.execDetached(["bash", helperPath, "terminal", action, vaultPath])
+  function loadRemoteVaults() {
+    if (remoteProcess.running || !installed || !nodeSupported) return
+    _remoteOutput = ""
+    _remoteError = ""
+    _remoteTimedOut = false
+    remoteError = ""
+    remoteLoading = true
+    remoteProcess.command = ["bash", helperPath, "remote-vaults"]
+    remoteProcess.running = true
+    remoteWatchdog.restart()
+  }
+
+  function applyRemoteVaults(raw) {
+    var result = Model.parseRemoteVaults(raw)
+    if (!result.ok) {
+      remoteVaults = []
+      remoteError = result.error
+      return
+    }
+    remoteVaults = result.vaults
+    remoteError = result.vaults.length === 0 ? "No remote vaults are available for this account." : ""
+  }
+
+  function launchTerminal(action, argument, secondArgument) {
+    var command = ["bash", helperPath, "terminal", action]
+    if (argument !== undefined) command.push(String(argument))
+    if (secondArgument !== undefined) command.push(String(secondArgument))
+    Quickshell.execDetached(command)
   }
 
   function install() { launchTerminal("install") }
+  function login() { launchTerminal("login") }
   function setup() { launchTerminal("setup") }
-  function syncOnce() { if (configured) launchTerminal("sync-once") }
+  function setupSelected(vaultId, path) { launchTerminal("setup-selected", vaultId, path) }
+  function syncOnce() { if (configured) launchTerminal("sync-once", vaultPath) }
   function showLogs() { launchTerminal("logs") }
 
   function openVault() {
@@ -156,6 +193,16 @@ Item {
     onTriggered: if (statusProcess.running) {
       root._statusTimedOut = true
       statusProcess.running = false
+    }
+  }
+
+  Timer {
+    id: remoteWatchdog
+    interval: 15000
+    repeat: false
+    onTriggered: if (remoteProcess.running) {
+      root._remoteTimedOut = true
+      remoteProcess.running = false
     }
   }
 
@@ -215,6 +262,37 @@ Item {
       }
       actionStatusTimer.restart()
       delayedRefresh.restart()
+    }
+  }
+
+  Process {
+    id: remoteProcess
+    running: false
+    command: []
+    stdout: StdioCollector {
+      id: remoteStdout
+      waitForEnd: true
+      onStreamFinished: root._remoteOutput = text
+    }
+    stderr: StdioCollector {
+      id: remoteStderr
+      waitForEnd: true
+      onStreamFinished: root._remoteError = text
+    }
+    onExited: function(exitCode) {
+      remoteWatchdog.stop()
+      root.remoteLoading = false
+      var stdout = String(remoteStdout.text || root._remoteOutput || "")
+      var stderr = String(remoteStderr.text || root._remoteError || "")
+      if (root._remoteTimedOut) {
+        root.remoteVaults = []
+        root.remoteError = "Loading remote vaults timed out."
+      } else if (exitCode === 0) {
+        root.applyRemoteVaults(stdout)
+      } else {
+        root.remoteVaults = []
+        root.remoteError = root.elide(stderr || stdout || "Could not load remote vaults. Log in and try again.")
+      }
     }
   }
 }

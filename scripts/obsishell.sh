@@ -263,6 +263,12 @@ install_headless() {
   printf '\nInstalled %s\n' "$("$HOME/.local/bin/ob" --version)"
 }
 
+list_remote_vaults() {
+  local ob=""
+  ob="$(resolve_ob)" || fail "Install Obsidian Headless first"
+  "$ob" sync-list-remote --json
+}
+
 setup_vault() {
   local ob="" answer="" vault="" vault_path=""
   ob="$(resolve_ob)" || fail "Install Obsidian Headless first"
@@ -298,8 +304,37 @@ EOF
   fi
 }
 
+setup_selected_vault() {
+  local vault="${1:-}" vault_path="${2:-}" ob="" answer=""
+  [[ -n $vault ]] || fail "A remote vault is required"
+  [[ -n $vault_path ]] || fail "A local vault path is required"
+  [[ $vault != *$'\n'* ]] || fail "Vault IDs containing newlines are unsupported"
+  [[ $vault_path != *$'\n'* ]] || fail "Vault paths containing newlines are unsupported"
+  ob="$(resolve_ob)" || fail "Install Obsidian Headless first"
+  vault_path="$(canonical_path "$vault_path")"
+
+  cat <<'EOF'
+Back up your vault before continuing.
+Do not run Obsidian desktop Sync and Headless Sync on the same device; using
+both can cause conflicts. An active Obsidian Sync subscription is required.
+EOF
+  printf '\nSet up Headless Sync in %s? [y/N] ' "$vault_path"
+  IFS= read -r answer
+  [[ $answer == y || $answer == Y ]] || return 0
+
+  mkdir -p -- "$vault_path"
+  "$ob" sync-setup --vault "$vault" --path "$vault_path"
+  printf '\nStart continuous sync at login? [Y/n] '
+  IFS= read -r answer
+  if [[ $answer != n && $answer != N ]]; then
+    start_service "$vault_path"
+  else
+    printf '\nRun a one-time sync before opening this vault: ob sync --path %q\n' "$vault_path"
+  fi
+}
+
 run_in_terminal() {
-  local action="${1:-}" vault_path="${2:-}" result=0
+  local action="${1:-}" argument="${2:-}" second_argument="${3:-}" result=0
   printf 'Obsidian Headless Sync for Omarchy\n'
   printf '%s\n\n' '----------------------------------'
   set +e
@@ -308,13 +343,21 @@ run_in_terminal() {
       (set -e; install_headless)
       result=$?
       ;;
+    login)
+      "$(resolve_ob)" login
+      result=$?
+      ;;
     setup)
       (set -e; setup_vault)
       result=$?
       ;;
+    setup-selected)
+      (set -e; setup_selected_vault "$argument" "$second_argument")
+      result=$?
+      ;;
     sync-once)
-      if [[ -n $vault_path ]]; then
-        "$(resolve_ob)" sync --path "$vault_path"
+      if [[ -n $argument ]]; then
+        "$(resolve_ob)" sync --path "$argument"
         result=$?
       else
         fail "No configured vault is selected"
@@ -346,7 +389,7 @@ launch_terminal() {
   command -v uwsm-app >/dev/null 2>&1 || fail "uwsm-app is not installed"
   command -v xdg-terminal-exec >/dev/null 2>&1 || fail "xdg-terminal-exec is not installed"
   exec uwsm-app -- xdg-terminal-exec --title="Obsidian Headless Sync" -- \
-    bash "$script_path" run-terminal "${1:-}" "${2:-}"
+    bash "$script_path" run-terminal "$@"
 }
 
 main() {
@@ -358,9 +401,10 @@ main() {
     service-stop) stop_service ;;
     service-remove) remove_service ;;
     run-service) run_service ;;
+    remote-vaults) list_remote_vaults ;;
     terminal) launch_terminal "$@" ;;
     run-terminal) run_in_terminal "$@" ;;
-    *) fail "usage: ${0##*/} {status|service-start|service-stop|service-remove|terminal}" ;;
+    *) fail "usage: ${0##*/} {status|remote-vaults|service-start|service-stop|service-remove|terminal}" ;;
   esac
 }
 

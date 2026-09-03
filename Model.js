@@ -36,6 +36,40 @@ function parseStatus(raw) {
   }
 }
 
+function parseRemoteVaults(raw) {
+  var text = clean(raw)
+  if (text === "") return { ok: false, error: "Empty remote vault response" }
+
+  try {
+    var data = JSON.parse(text)
+    if (!Array.isArray(data.vaults) || !Array.isArray(data.shared)) {
+      return { ok: false, error: "Invalid remote vault response" }
+    }
+
+    var vaults = []
+    function append(items, shared) {
+      for (var i = 0; i < items.length; i++) {
+        var id = clean(items[i] && items[i].id)
+        if (id === "") continue
+        var name = clean(items[i].name) || id
+        var region = clean(items[i].region)
+        vaults.push({
+          id: id,
+          name: name,
+          region: region,
+          shared: shared,
+          label: name + (shared ? " (shared)" : "") + (region ? " · " + region : "")
+        })
+      }
+    }
+    append(data.vaults, false)
+    append(data.shared, true)
+    return { ok: true, vaults: vaults }
+  } catch (error) {
+    return { ok: false, error: "Invalid remote vault response" }
+  }
+}
+
 function statusText(status) {
   if (!status || status.ok !== true) return "Status unavailable"
   if (status.state === "missing") return "Headless client not installed"
@@ -48,6 +82,7 @@ function statusText(status) {
 if (typeof module !== "undefined") {
   module.exports = {
     parseStatus: parseStatus,
+    parseRemoteVaults: parseRemoteVaults,
     statusText: statusText
   }
 }

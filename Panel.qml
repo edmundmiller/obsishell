@@ -18,18 +18,94 @@ Panel {
   readonly property color barIconColor: sync.lastError !== ""
     ? urgent
     : (sync.serviceRunning && sync.serviceMatchesVault ? barForeground : Qt.darker(barForeground, 1.55))
+  readonly property string folderPickerScript: localPathFromUrl(
+    Qt.resolvedUrl("scripts/folder-picker.sh"))
+  property bool setupOpen: false
+  property string selectedVaultId: ""
+  property string selectedFolder: ""
+  property string folderPickerOutput: ""
+  property string folderPickerError: ""
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
   onOpenedChanged: if (opened) {
     sync.refresh()
+    maybeLoadRemoteVaults()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  function maybeLoadRemoteVaults() {
+    if (sync.installed && sync.nodeSupported && sync.remoteVaults.length === 0
+        && (!sync.configured || setupOpen)) sync.loadRemoteVaults()
+  }
+
+  function localPathFromUrl(value) {
+    var path = String(value || "")
+    if (path.indexOf("file://") === 0) path = path.slice(7)
+    return decodeURIComponent(path)
+  }
+
+  function openSetup() {
+    setupOpen = true
+    sync.loadRemoteVaults()
+  }
+
+  function browseForFolder() {
+    if (folderPickerProcess.running) return
+    folderPickerOutput = ""
+    folderPickerError = ""
+    folderPickerProcess.command = ["bash", folderPickerScript]
+    close()
+    folderPickerProcess.running = true
+  }
+
+  function finishSetup() {
+    if (selectedVaultId === "" || selectedFolder === "") return
+    sync.setupSelected(selectedVaultId, selectedFolder)
+    close()
   }
 
   Service {
     id: sync
     settings: root.settings
+  }
+
+  Connections {
+    target: sync
+    function onInstalledChanged() { root.maybeLoadRemoteVaults() }
+    function onConfiguredChanged() { root.maybeLoadRemoteVaults() }
+    function onRemoteVaultsChanged() {
+      var selectedStillExists = false
+      for (var i = 0; i < sync.remoteVaults.length; i++) {
+        if (sync.remoteVaults[i].id === root.selectedVaultId) selectedStillExists = true
+      }
+      if (!selectedStillExists) root.selectedVaultId = sync.remoteVaults.length > 0
+        ? sync.remoteVaults[0].id : ""
+    }
+  }
+
+  Process {
+    id: folderPickerProcess
+    command: []
+
+    stdout: StdioCollector {
+      id: folderPickerStdout
+      waitForEnd: true
+      onStreamFinished: root.folderPickerOutput = text
+    }
+
+    onExited: function(exitCode) {
+      var selected = String(root.folderPickerOutput || folderPickerStdout.text || "").trim()
+      if (exitCode === 0 && selected) {
+        root.selectedFolder = root.localPathFromUrl(selected)
+      } else if (exitCode !== 0) {
+        root.folderPickerError = "Folder chooser failed. Try again."
+      }
+      Qt.callLater(function() {
+        root.open()
+      })
+    }
   }
 
   IpcHandler {
@@ -114,7 +190,7 @@ Panel {
           trailingControl: Component {
             ToggleSwitch {
               id: powerSwitch
-              visible: sync.configured
+              visible: sync.configured && !root.setupOpen
               checked: sync.serviceRunning && sync.serviceMatchesVault
               busy: sync.busy
               foreground: root.foreground
@@ -159,7 +235,7 @@ Panel {
         }
 
         Column {
-          visible: sync.configured
+          visible: sync.configured && !root.setupOpen
           width: parent.width
           spacing: Style.space(5)
 
@@ -208,19 +284,121 @@ Panel {
         }
 
         Button {
-          visible: sync.installed
+          visible: sync.installed && sync.configured && !root.setupOpen
           width: parent.width
-          text: sync.configured ? "Set up another vault" : "Log in and set up a vault"
+          text: "Set up another vault"
           iconText: "󰒓"
           bordered: true
           leftAlign: true
           foreground: root.foreground
           fontFamily: root.fontFamily
-          onClicked: sync.setup()
+          onClicked: root.openSetup()
+        }
+
+        Column {
+          visible: sync.installed && sync.nodeSupported && (!sync.configured || root.setupOpen)
+          width: parent.width
+          spacing: Style.space(8)
+
+          PanelSectionHeader {
+            text: "SET UP A VAULT"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+          }
+
+          Text {
+            width: parent.width
+            text: "Choose the remote vault and its local folder here. Passwords remain in the secure terminal prompt."
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+          }
+
+          Text {
+            visible: sync.remoteLoading || sync.remoteError !== "" || root.folderPickerError !== ""
+            width: parent.width
+            text: sync.remoteLoading
+              ? "Loading remote vaults…"
+              : (root.folderPickerError || sync.remoteError)
+            color: sync.remoteError !== "" || root.folderPickerError !== "" ? root.urgent : root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+          }
+
+          Dropdown {
+            visible: sync.remoteOptions.length > 0
+            width: parent.width
+            label: "Remote vault"
+            options: sync.remoteOptions
+            value: root.selectedVaultId
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onChanged: function(value) { root.selectedVaultId = value }
+          }
+
+          Button {
+            visible: root.selectedVaultId !== ""
+            width: parent.width
+            text: root.selectedFolder === "" ? "Choose local folder" : root.selectedFolder
+            iconText: "󰉋"
+            bordered: true
+            leftAlign: true
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: root.browseForFolder()
+          }
+
+          Button {
+            visible: root.selectedVaultId !== "" && root.selectedFolder !== ""
+            width: parent.width
+            text: "Continue setup"
+            iconText: "󰄬"
+            bordered: true
+            leftAlign: true
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: root.finishSetup()
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(8)
+
+            Button {
+              width: (parent.width - parent.spacing) / 2
+              text: "Log in"
+              iconText: "󰍂"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: sync.login()
+            }
+
+            Button {
+              width: (parent.width - parent.spacing) / 2
+              text: sync.remoteLoading ? "Loading…" : "Reload vaults"
+              iconText: "󰑐"
+              iconSpinning: sync.remoteLoading
+              enabled: !sync.remoteLoading
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: sync.loadRemoteVaults()
+            }
+          }
+
+          Button {
+            visible: sync.configured && root.setupOpen
+            width: parent.width
+            text: "Cancel"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: root.setupOpen = false
+          }
         }
 
         Row {
-          visible: sync.configured
+          visible: sync.configured && !root.setupOpen
           width: parent.width
           spacing: Style.space(8)
 
@@ -246,7 +424,7 @@ Panel {
         }
 
         Row {
-          visible: sync.configured
+          visible: sync.configured && !root.setupOpen
           width: parent.width
           spacing: Style.space(8)
 
