@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.edmundmiller.obsishell",
+  "name": "Obsidian Headless Sync",
+  "version": "0.1.0",
+  "author": "Edmund Miller",
+  "license": "MIT",
+  "description": "Monitor and control Obsidian Headless Sync from the Omarchy bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Obsidian Headless Sync",
+    "description": "Install, configure, monitor, and control continuous Obsidian Headless Sync.",
+    "category": "Files",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 15,
+      "vaultPath": ""
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 5,
+        "max": 3600,
+        "step": 5,
+        "defaultValue": 15
+      },
+      {
+        "key": "vaultPath",
+        "type": "string",
+        "label": "Vault path",
+        "defaultValue": "",
+        "description": "Absolute path to manage. Leave blank to use the first configured Headless Sync vault."
+      }
+    ]
+  }
+}
