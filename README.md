@@ -14,10 +14,12 @@ Open the Obsidian icon in the bar, then:
 
 1. Select **Install Obsidian Headless**. This installs Node.js 22+ through
    Omarchy if needed, then installs `obsidian-headless` into `~/.local`.
-2. Select **Log in and set up a vault**. The terminal wizard logs in, lists
-   remote vaults, connects one to a local folder, and can enable continuous
-   sync.
-3. Use the switch to start or stop continuous sync.
+2. Select **Log in** if needed, then **Reload vaults**. Choose a remote vault
+   and local folder directly in the panel.
+3. Select **Continue setup**. A short terminal prompt handles only confirmation,
+   the end-to-end encryption password when required, and whether to enable
+   continuous sync.
+4. Use the switch to start or stop continuous sync.
 
 An active [Obsidian Sync subscription](https://obsidian.md/sync) is required.
 Obsidian Headless is currently an open beta.
@@ -61,8 +63,8 @@ Independent one-time syncs remain available for any vault through the `ob` CLI.
   `~/.config/obsishell/` with user-only permissions.
 - Creates `~/.config/systemd/user/obsishell.service` when continuous sync is
   first enabled.
-- Reads `ob`'s non-secret JSON output, systemd state, and the latest journal
-  line for display.
+- Reads `ob`'s non-secret local and remote vault JSON, systemd state, and the
+  latest journal line for display.
 
 Authentication tokens and vault encryption keys remain owned by the official
 client under `~/.config/obsidian-headless/`. Obsishell does not read, copy, log,
