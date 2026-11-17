@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "cd ../.. && tools/oxlint/node_modules/.bin/oxlint -c oxlint.config.mts Model.js tests",
+    "lint:strict": "cd ../.. && tools/oxlint/node_modules/.bin/oxlint -c oxlint.strict.config.mts Model.js tests",
+    "lint:jev": "cd ../.. && node tools/oxlint/anti-slop/jev/lint-changed.ts --oxlint=tools/oxlint/node_modules/.bin/oxlint -c oxlint.jev.config.mts",
+    "lint:jev:full": "cd ../.. && node tools/oxlint/anti-slop/jev/lint-changed.ts --all --oxlint=tools/oxlint/node_modules/.bin/oxlint -c oxlint.jev.config.mts Model.js tests",
+    "lint:diff": "cd ../.. && node tools/oxlint/anti-slop/diff-rules/run.ts --config anti-slop-diff-rules.config.mts",
+    "test:lint": "node test-rules.mjs"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.86.0",
+    "oxlint": "1.86.0",
+    "oxlint-plugin-jev": "file:oxlint-plugin-jev"
+  }
+}

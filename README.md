@@ -102,6 +102,14 @@ bash tests/helper.test.sh
 qmllint -I "$OMARCHY_PATH/shell" Panel.qml Service.qml
 ```
 
+### Optional development lint tooling
+
+Install with `npm --prefix tools/oxlint ci`, then run `npm --prefix tools/oxlint run lint` and `npm --prefix tools/oxlint run test:lint`. Tooling needs Node >=22.18 and has its own private package/lockfile; it does not change the QML runtime or CommonJS model tests. Existing model/helper/plugin checks above remain unchanged. Oxlint/editor configuration is `oxlint.config.mts` (use the executable under `tools/oxlint/node_modules/.bin`). Only owned `Model.js` and JavaScript tests are lint targets; QML and the separately installed official client are not reinterpreted as owned JS/TS. No TypeScript project or typecheck is introduced.
+
+Ordinary lint is offline and never registers a model plugin. Edmund approved staged activation on 2026-11-16: original gates/severities are preserved, normal lint enables zero-conflict Core errors and seven advisory Fowler rules, and `npm --prefix tools/oxlint run lint:strict` keeps the full conflicting policy separately runnable as a proposal. This resolves staging, not full strict acceptance or authorization for source migration, permanent exemptions or publication. Unavailable QML/Omarchy validation tools remain a separate environment limitation.
+
+Only explicitly running the package's `lint:jev`, `lint:jev:full`, or `lint:diff` opts into potentially paid review. No credentials or CI gates are provisioned. Changed-file Jev includes whole-file questions that can transmit untouched functions in changed files; function questions filter by changed overlaps. Diff review includes hunks, context, summaries and history, not changed lines only. Inspect inputs before configuring a provider or command backend. See [provenance and policy](tools/oxlint/anti-slop/UPSTREAM.md).
+
 ## License
 
 MIT. Obsidian and Obsidian Sync are trademarks and services of Dynalist Inc.;
