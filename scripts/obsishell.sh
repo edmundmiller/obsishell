@@ -287,6 +287,7 @@ run_service() {
 }
 
 install_headless() {
+  local install_root="$HOME/.local"
   if ! node_supported; then
     command -v omarchy >/dev/null 2>&1 || fail "Omarchy is required to install Node.js"
     printf '\n==> Installing Node.js and npm through Omarchy\n'
@@ -295,8 +296,9 @@ install_headless() {
   node_supported || fail "Node.js 22 or later is required"
   command -v npm >/dev/null 2>&1 || fail "npm is not installed"
   printf '\n==> Installing Obsidian Headless into ~/.local\n'
-  npm install --global --prefix "$HOME/.local" obsidian-headless
-  printf '\nInstalled %s\n' "$("$HOME/.local/bin/ob" --version)"
+  npm install --global --prefix "$install_root" --force \
+    --allow-scripts=better-sqlite3 obsidian-headless
+  printf '\nInstalled %s\n' "$("$install_root/bin/ob" --version)"
 }
 
 list_remote_vaults() {

@@ -17,6 +17,15 @@ cat >"$fake_bin/node" <<'EOF'
 printf 'v22.12.0\n'
 EOF
 
+cat >"$fake_bin/npm" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$HOME/npm-calls"
+if [[ ${1:-} == install ]]; then
+  mkdir -p -- "$HOME/.local/bin"
+  ln -sf -- "$(command -v ob)" "$HOME/.local/bin/ob"
+fi
+EOF
+
 cat >"$fake_bin/ob" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -53,7 +62,13 @@ cat >"$fake_bin/journalctl" <<'EOF'
 printf 'Fully synced\n'
 EOF
 
-chmod +x "$fake_bin/node" "$fake_bin/ob" "$fake_bin/systemctl" "$fake_bin/journalctl"
+chmod +x "$fake_bin/node" "$fake_bin/npm" "$fake_bin/ob" "$fake_bin/systemctl" "$fake_bin/journalctl"
+
+printf '\n' | bash "$root/scripts/obsishell.sh" run-terminal install >/dev/null
+cat >"$tmp/expected-npm-calls" <<EOF
+install --global --prefix $HOME/.local --force --allow-scripts=better-sqlite3 obsidian-headless
+EOF
+diff -u "$tmp/expected-npm-calls" "$HOME/npm-calls"
 
 status="$(bash "$root/scripts/obsishell.sh" status)"
 jq -e --arg path "$HOME/Vault With Spaces" --arg work "$HOME/Work" '
