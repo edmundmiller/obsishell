@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Rebuild Obsishell's incompatible native SQLite dependency when a Node upgrade
+  changes its ABI, without repeatedly retrying a failed rebuild.
+
 ## [0.2.0] - 2026-09-02
 
 ### Added

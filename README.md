@@ -74,6 +74,16 @@ Authentication tokens and vault encryption keys remain owned by the official
 client under `~/.config/obsidian-headless/`. Obsishell does not read, copy, log,
 or pass credentials itself.
 
+On service startup, Obsishell checks the native `better-sqlite3` addon in its
+own `~/.local` installation. If a Node upgrade has made the addon incompatible,
+it rebuilds that dependency with npm before starting sync. This can require
+network access or build tools. Other client installations are not modified.
+A failed or interrupted rebuild is attempted only once to avoid repeated npm
+operations; check the service logs, reinstall Obsidian Headless using the panel,
+and restart continuous sync. A successful native load clears the retry guard.
+The generated service stops restarting on repair failure; existing service units
+receive this setting the next time continuous sync is enabled through Obsishell.
+
 The official Obsidian silhouette is rendered as a monochrome mask. Its color
 follows the current Omarchy theme, dims while continuous sync is stopped, and
 shows a small sync badge while continuous sync is running. It uses the theme's

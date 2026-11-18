@@ -243,6 +243,7 @@ Type=simple
 ExecStart=/usr/bin/bash $(systemd_quote "$script_path") run-service
 Restart=on-failure
 RestartSec=5
+RestartPreventExitStatus=78
 
 [Install]
 WantedBy=default.target
@@ -272,8 +273,52 @@ remove_service() {
     rm -- "$service_file"
   fi
   rm -f -- "$vault_file" "$ob_file"
+  rmdir -- "$config_root/native-rebuild-attempt" 2>/dev/null || true
   systemctl --user daemon-reload
   printf 'Obsishell service removed; Obsidian credentials and vault data were preserved.\n'
+}
+
+check_native_addon() {
+  node -e '
+    try {
+      const Database = require(process.argv[1] + "/node_modules/better-sqlite3");
+      new Database(":memory:").close();
+    } catch (error) {
+      if (error.code === "ERR_DLOPEN_FAILED" && /NODE_MODULE_VERSION/.test(error.message)) process.exit(42);
+      process.exit(1);
+    }
+  ' "$1"
+}
+
+repair_native_addon() {
+  local ob="$1" package="$HOME/.local/lib/node_modules/obsidian-headless"
+  local marker="$config_root/native-rebuild-attempt" result=0
+  # Only repair the installation managed by this plugin, not arbitrary ob wrappers.
+  [[ $ob == "$(readlink -f -- "$package/cli.js")" ]] || return 0
+  [[ -d $package/node_modules/better-sqlite3 ]] || return 0
+
+  check_native_addon "$package" || result=$?
+  if (( result == 0 )); then
+    rmdir -- "$marker" 2>/dev/null || true
+    return 0
+  fi
+  # Leave unrelated errors to the client; do not reinstall on an unknown failure.
+  (( result == 42 )) || return 0
+
+  if ! mkdir -- "$marker" 2>/dev/null; then
+    printf 'Native addon repair already attempted. Reinstall Obsidian Headless, then restart the service.\n' >&2
+    return 78
+  fi
+  printf 'Node ABI changed; rebuilding Obsidian Headless better-sqlite3.\n' >&2
+  if ! npm rebuild --prefix "$package" --ignore-scripts=false better-sqlite3; then
+    printf 'Native addon rebuild failed. Reinstall Obsidian Headless, then restart the service.\n' >&2
+    return 78
+  fi
+  if ! check_native_addon "$package"; then
+    printf 'Native addon still cannot load. Reinstall Obsidian Headless, then restart the service.\n' >&2
+    return 78
+  fi
+  rmdir -- "$marker"
 }
 
 run_service() {
@@ -283,6 +328,7 @@ run_service() {
   IFS= read -r vault_path <"$vault_file"
   IFS= read -r ob <"$ob_file"
   [[ -x $ob ]] || fail "Obsidian Headless executable is unavailable: $ob"
+  repair_native_addon "$ob" || return $?
   exec "$ob" sync --continuous --path "$vault_path"
 }
 

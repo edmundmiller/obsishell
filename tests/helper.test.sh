@@ -14,6 +14,13 @@ export PATH="$fake_bin:/usr/bin:/bin"
 
 cat >"$fake_bin/node" <<'EOF'
 #!/usr/bin/env bash
+if [[ ${1:-} == -e ]]; then
+  case "$(<"$HOME/native-probe-state")" in
+    mismatch) exit 42 ;;
+    broken) exit 1 ;;
+    *) exit 0 ;;
+  esac
+fi
 printf 'v22.12.0\n'
 EOF
 
@@ -26,6 +33,9 @@ if [[ ${1:-} == install ]]; then
   if [[ " $* " == *' --force '* && " $* " == *' --allow-scripts=better-sqlite3 '* ]]; then
     touch "$HOME/native-addon-ready"
   fi
+elif [[ ${1:-} == rebuild ]]; then
+  [[ ${FAKE_REBUILD_FAIL:-false} != true ]] || exit 1
+  printf 'healthy\n' >"$HOME/native-probe-state"
 fi
 EOF
 
@@ -129,6 +139,7 @@ bash "$root/scripts/obsishell.sh" service-start "$HOME/Vault With Spaces" >/dev/
 unit="$XDG_CONFIG_HOME/systemd/user/obsishell.service"
 grep -Fxq '# Managed by obsishell' "$unit"
 grep -Fq 'run-service' "$unit"
+grep -Fxq 'RestartPreventExitStatus=78' "$unit"
 [[ $(<"$XDG_CONFIG_HOME/obsishell/vault-path") == "$HOME/Vault With Spaces" ]]
 grep -Fq 'enable --now obsishell.service' "$HOME/systemctl-calls"
 
@@ -144,6 +155,43 @@ jq -e '.state == "running"
 
 bash "$root/scripts/obsishell.sh" run-service
 [[ $(<"$HOME/sync-args") == "sync --continuous --path $HOME/Vault With Spaces" ]]
+
+# Exercise the managed npm installation rather than the unrelated fake ob above.
+package="$HOME/.local/lib/node_modules/obsidian-headless"
+mkdir -p "$package/node_modules/better-sqlite3"
+cp "$fake_bin/ob" "$package/cli.js"
+printf '%s\n' "$package/cli.js" >"$XDG_CONFIG_HOME/obsishell/ob-path"
+printf 'mismatch\n' >"$HOME/native-probe-state"
+bash "$root/scripts/obsishell.sh" run-service
+[[ $(<"$HOME/native-probe-state") == healthy ]]
+grep -Fxq "rebuild --prefix $package --ignore-scripts=false better-sqlite3" "$HOME/npm-calls"
+calls=$(grep -c '^rebuild ' "$HOME/npm-calls")
+bash "$root/scripts/obsishell.sh" run-service
+[[ $(grep -c '^rebuild ' "$HOME/npm-calls") == "$calls" ]]
+printf 'broken\n' >"$HOME/native-probe-state"
+bash "$root/scripts/obsishell.sh" run-service
+[[ $(grep -c '^rebuild ' "$HOME/npm-calls") == "$calls" ]]
+
+printf 'mismatch\n' >"$HOME/native-probe-state"
+rm "$HOME/sync-args"
+export FAKE_REBUILD_FAIL=true
+if bash "$root/scripts/obsishell.sh" run-service >"$tmp/rebuild.out" 2>&1; then
+  echo 'failed rebuild unexpectedly started sync' >&2; exit 1
+else
+  [[ $? == 78 ]]
+fi
+[[ ! -e $HOME/sync-args ]]
+calls=$(grep -c '^rebuild ' "$HOME/npm-calls")
+if bash "$root/scripts/obsishell.sh" run-service >"$tmp/retry.out" 2>&1; then
+  echo 'failed rebuild unexpectedly retried sync' >&2; exit 1
+else
+  [[ $? == 78 ]]
+fi
+[[ $(grep -c '^rebuild ' "$HOME/npm-calls") == "$calls" ]]
+unset FAKE_REBUILD_FAIL
+printf 'healthy\n' >"$HOME/native-probe-state"
+bash "$root/scripts/obsishell.sh" run-service
+[[ ! -e $XDG_CONFIG_HOME/obsishell/native-rebuild-attempt ]]
 
 bash "$root/scripts/obsishell.sh" service-stop >/dev/null
 grep -Fq 'reset-failed obsishell.service' "$HOME/systemctl-calls"
