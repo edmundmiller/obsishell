@@ -137,6 +137,17 @@ Panel {
           color: root.barIconColor
           pulsing: sync.refreshing
         }
+
+        Text {
+          visible: sync.serviceRunning && sync.serviceMatchesVault
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.margins: Style.space(1)
+          text: "󰑐"
+          color: root.barIconColor
+          font.family: root.fontFamily
+          font.pixelSize: Style.space(8)
+        }
       }
     }
     onPressed: function(buttonCode) {

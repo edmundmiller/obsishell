@@ -76,7 +76,8 @@ or pass credentials itself.
 
 The official Obsidian silhouette is rendered as a monochrome mask. Its color
 follows the current Omarchy theme, dims while continuous sync is stopped, and
-uses the theme's urgent color when status checks fail.
+shows a small sync badge while continuous sync is running. It uses the theme's
+urgent color when status checks fail.
 
 ## Remove
 

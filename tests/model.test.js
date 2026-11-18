@@ -73,6 +73,8 @@ const root = path.resolve(__dirname, "..")
 const panel = fs.readFileSync(path.join(root, "Panel.qml"), "utf8")
 const icon = fs.readFileSync(path.join(root, "assets/obsidian.svg"), "utf8")
 assert.equal((panel.match(/ObsidianIcon \{/g) || []).length, 2)
+assert.equal(panel.includes("visible: sync.serviceRunning && sync.serviceMatchesVault"), true)
+assert.equal(panel.includes("color: root.barIconColor"), true)
 assert.equal(panel.includes('text: "◆"'), false)
 assert.equal((icon.match(/<path fill="#fff"/g) || []).length, 3)
 
