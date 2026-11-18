@@ -23,13 +23,22 @@ printf '%s\n' "$*" >>"$HOME/npm-calls"
 if [[ ${1:-} == install ]]; then
   mkdir -p -- "$HOME/.local/bin"
   ln -sf -- "$(command -v ob)" "$HOME/.local/bin/ob"
+  if [[ " $* " == *' --force '* && " $* " == *' --allow-scripts=better-sqlite3 '* ]]; then
+    touch "$HOME/native-addon-ready"
+  fi
 fi
 EOF
 
 cat >"$fake_bin/ob" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
-  --version) printf '0.0.14\n' ;;
+  --version)
+    if [[ ! -f $HOME/native-addon-ready ]]; then
+      printf 'ERR_DLOPEN_FAILED: better_sqlite3.node uses the previous Node ABI\n' >&2
+      exit 1
+    fi
+    printf '0.0.14\n'
+    ;;
   sync-list-local)
     printf '{"vaults":[{"id":"vault-1","path":"%s/Vault With Spaces","host":"sync.example"},{"id":"vault-2","path":"%s/Work","host":"sync.example"}]}\n' "$HOME" "$HOME"
     ;;
@@ -65,6 +74,7 @@ EOF
 chmod +x "$fake_bin/node" "$fake_bin/npm" "$fake_bin/ob" "$fake_bin/systemctl" "$fake_bin/journalctl"
 
 printf '\n' | bash "$root/scripts/obsishell.sh" run-terminal install >/dev/null
+"$HOME/.local/bin/ob" --version >/dev/null
 cat >"$tmp/expected-npm-calls" <<EOF
 install --global --prefix $HOME/.local --force --allow-scripts=better-sqlite3 obsidian-headless
 EOF
